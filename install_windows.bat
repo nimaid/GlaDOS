@@ -1,26 +1,106 @@
 @echo off
 REM Download and install the required dependencies for the project on Windows
 
-echo Creating Virtual Environment...
-pip install uv
-uv self update
-uv venv --python 3.12.8
-call  .venv\Scripts\activate
-
-echo Installing Dependencies...
-nvcc --version >nul 2>&1
-if %ERRORLEVEL%==0 (
-    echo CUDA is available. Installing requirements-cuda.txt...
-    uv pip install -r requirements_cuda.txt
-) else (
-    echo CUDA is not available. Installing requirements.txt...
-    UV pip install -r requirements.txt
-)
-
-echo Downloading Models...
-
 :: Enable delayed expansion for working with variables inside loops
 setlocal enabledelayedexpansion
+
+echo Testing for existing CUDA installation...
+nvcc --version >nul 2>nul
+if !errorlevel! EQU 0 (
+    echo Found existing CUDA installation^!
+
+    echo Creating virtual environment ^(uv^)...
+    pip install uv
+    uv self update
+    uv venv --python 3.12.8
+    call  .venv\Scripts\activate
+    uv pip install -r requirements_cuda.txt
+
+    echo Installing requirements-cuda.txt...
+    uv pip install -r requirements_cuda.txt
+) else (
+    echo Could not find CUDA^!
+    echo.
+    :INSTALL_PROMPT
+    echo You may choose from several installation methods:
+    echo.
+    echo 1. CPU only [Universal]
+    echo 2. CUDA accelerated [Nvidia]
+    set /p install_choice= Please enter your desired install option: 
+    echo !install_choice!
+    if "!install_choice!"=="1" (
+        echo Installing CPU only [Universal].
+        
+        echo Checking for pip...
+        where pip >nul 2>nul
+        if !errorlevel! EQU 0 (
+            echo Found existing pip^!
+            
+            echo Creating virtual environment ^(uv^)...
+            pip install uv
+            uv self update
+            uv venv --python 3.12.8
+            call  .venv\Scripts\activate
+            uv pip install -r requirements_cuda.txt
+
+            echo Installing requirements.txt...
+            uv pip install -r requirements.txt
+            goto DOWNLOAD_MODELS
+        ) else (
+            echo Could not find pip^!
+        )
+    ) else if "!install_choice!"=="2" (
+        echo Installing CUDA accelerated [Nvidia].
+    ) else (
+        echo Invalid option.
+        echo.
+        goto INSTALL_PROMPT
+    )
+
+    echo Checking if conda is already installed...
+    where conda >nul 2>nul
+    if !errorlevel! EQU 0 (
+        echo Conda is already installed^!
+        set CONDA_PATH=conda
+    ) else (
+        echo Could not find conda^!
+        
+        call scripts\install_conda_windows.bat
+        if errorlevel 1 goto CONDA_ERROR
+
+        set "CONDA_PATH=%USERPROFILE%\Miniconda3\Scripts\conda.exe"
+    )
+    
+    echo Checking if virtual environment is already installed...
+    "!CONDA_PATH!" list --name glados >nul 2>nul
+    if !errorlevel! EQU 0 (
+        echo Virtual environment already installed.
+        goto DOWNLOAD_MODELS
+    )
+    
+    echo Virtual environment not installed^!
+    
+    echo Creating virtual environment ^(conda^)...
+    REM TODO: Nothing runs after this?!?! Not even the model download.
+    if "!install_choice!"=="1" (
+        call "!CONDA_PATH!" env create -f environment.yml
+    ) else if "!install_choice!"=="2" (
+        call "!CONDA_PATH!" env create -f environment_cuda.yml
+    )
+    if !errorlevel! EQU 1 goto ENV_ERROR
+)
+goto DOWNLOAD_MODELS
+
+:CONDA_ERROR
+echo Miniconda3 install failed!
+goto END
+
+:ENV_ERROR
+echo Environment install failed!
+goto END
+
+:DOWNLOAD_MODELS
+echo Downloading models...
 
 :: Define the list of files with their URLs and local paths
 :: Removed quotes around the entire string and fixed paths
@@ -42,16 +122,21 @@ for /l %%i in (0,1,3) do (
         ) else (
             echo Downloading !file!...
             curl -L "!url!" --create-dirs -o "!file!"
+            if !errorlevel! equ 1 goto DOWNLOAD_FAILED
             
             if exist "!file!" (
                 echo Download successful.
             ) else (
+                :DOWNLOAD_FAILED
                 echo Download failed for !file!
                 echo URL: !url!
+                goto END
             )
         )
     )
 )
 
-echo Installation Complete!
+echo Installation complete!
+
+:END
 pause
