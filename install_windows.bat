@@ -6,18 +6,11 @@ setlocal enabledelayedexpansion
 
 echo Testing for existing CUDA installation...
 nvcc --version >nul 2>nul
-if !errorlevel! EQU 0 (
+if errorlevel 0 (
     echo Found existing CUDA installation^!
-
-    echo Creating virtual environment ^(uv^)...
-    pip install uv
-    uv self update
-    uv venv --python 3.12.8
-    call  .venv\Scripts\activate
-    uv pip install -r requirements_cuda.txt
-
-    echo Installing requirements-cuda.txt...
-    uv pip install -r requirements_cuda.txt
+    
+    call scripts\install_uv_venv_windows.bat requirements_cuda.txt
+    if errorlevel 1 goto ENV_ERROR
 ) else (
     echo Could not find CUDA^!
     echo.
@@ -33,18 +26,12 @@ if !errorlevel! EQU 0 (
         
         echo Checking for pip...
         where pip >nul 2>nul
-        if !errorlevel! EQU 0 (
+        if errorlevel 0 (
             echo Found existing pip^!
             
-            echo Creating virtual environment ^(uv^)...
-            pip install uv
-            uv self update
-            uv venv --python 3.12.8
-            call  .venv\Scripts\activate
-            uv pip install -r requirements_cuda.txt
-
-            echo Installing requirements.txt...
-            uv pip install -r requirements.txt
+            call scripts\install_uv_venv_windows.bat requirements.txt
+            if errorlevel 1 goto ENV_ERROR
+            
             goto DOWNLOAD_MODELS
         ) else (
             echo Could not find pip^!
@@ -59,7 +46,7 @@ if !errorlevel! EQU 0 (
 
     echo Checking if conda is already installed...
     where conda >nul 2>nul
-    if !errorlevel! EQU 0 (
+    if errorlevel 0 (
         echo Conda is already installed^!
         set CONDA_PATH=conda
     ) else (
@@ -73,7 +60,7 @@ if !errorlevel! EQU 0 (
     
     echo Checking if virtual environment is already installed...
     "!CONDA_PATH!" list --name glados >nul 2>nul
-    if !errorlevel! EQU 0 (
+    if errorlevel 0 (
         echo Virtual environment already installed.
         goto DOWNLOAD_MODELS
     )
