@@ -1,13 +1,12 @@
 @echo off
 
 set "MAIN_DIR=%CD%/.."
-cd %MAIN_DIR&
+cd %MAIN_DIR%
 
 set "REQUIREMENTS_TXT=%1"
 
 echo Installing uv with pip...
-pip install uv
-uv self update
+pip install --upgrade uv
 if errorlevel 1 goto FAIL
 
 echo Creating virtual environment with uv...
